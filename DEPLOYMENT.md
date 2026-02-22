@@ -13,6 +13,7 @@
 3. Copy environment file:
    - `cp .env.example .env`
 4. Edit `.env` with real values (minimum):
+   - `DATABASE_URL=<optional; full Postgres URL, if set it overrides DB_* values>`
    - `DB_HOST=<your_supabase_pooler_host>`
    - `DB_PORT=5432`
    - `DB_NAME=postgres`
