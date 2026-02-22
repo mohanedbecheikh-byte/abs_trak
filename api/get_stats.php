@@ -19,9 +19,9 @@ $stmt = $pdo->prepare(
         m.id,
         m.name,
         m.type,
-        SUM(a.status = 'present') AS present_count,
-        SUM(a.status = 'absent') AS absent_count,
-        SUM(a.status = 'unknown') AS unknown_count,
+        COUNT(a.id) FILTER (WHERE a.status = 'present') AS present_count,
+        COUNT(a.id) FILTER (WHERE a.status = 'absent') AS absent_count,
+        COUNT(a.id) FILTER (WHERE a.status = 'unknown') AS unknown_count,
         COUNT(a.id) AS recorded_count
      FROM modules m
      LEFT JOIN attendance a

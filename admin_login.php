@@ -5,8 +5,16 @@ require_once __DIR__ . '/includes/security.php';
 
 function ensureAdminTable(PDO $pdo): void
 {
-    $stmt = $pdo->query("SHOW TABLES LIKE 'admins'");
-    if (!$stmt->fetchColumn()) {
+    $stmt = $pdo->prepare(
+        "SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = current_schema()
+              AND table_name = 'admins'
+        )"
+    );
+    $stmt->execute();
+    if (!(bool)$stmt->fetchColumn()) {
         throw new RuntimeException('Admins table is missing. Run the latest database migration.');
     }
 }

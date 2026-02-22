@@ -9,19 +9,31 @@ requireAdminLogin();
 
 function ensureAdminTable(PDO $pdo): void
 {
-    $stmt = $pdo->query("SHOW TABLES LIKE 'admins'");
-    if (!$stmt->fetchColumn()) {
+    $stmt = $pdo->prepare(
+        "SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = current_schema()
+              AND table_name = 'admins'
+        )"
+    );
+    $stmt->execute();
+    if (!(bool)$stmt->fetchColumn()) {
         throw new RuntimeException('Admins table is missing. Run the latest database migration.');
     }
 }
 
 function hasStudentLoginTrackingColumns(PDO $pdo): bool
 {
-    $columns = $pdo->query('SHOW COLUMNS FROM students')->fetchAll(PDO::FETCH_COLUMN, 0);
-    if (!is_array($columns)) {
-        return false;
-    }
-    return in_array('first_login_at', $columns, true) && in_array('last_login_at', $columns, true);
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) >= 2
+         FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = 'students'
+           AND column_name IN ('first_login_at', 'last_login_at')"
+    );
+    $stmt->execute();
+    return (bool)$stmt->fetchColumn();
 }
 
 function setFlashMessage(string $type, string $text): void
@@ -211,8 +223,8 @@ if ($hasStudentLoginTracking) {
 
 $attBreakdown = $pdo->query(
     "SELECT
-        SUM(status = 'present') AS present_count,
-        SUM(status = 'absent') AS absent_count
+        COUNT(*) FILTER (WHERE status = 'present') AS present_count,
+        COUNT(*) FILTER (WHERE status = 'absent') AS absent_count
      FROM attendance"
 )->fetch();
 $presentTotal = (int)($attBreakdown['present_count'] ?? 0);
@@ -230,8 +242,8 @@ $students = $pdo->query(
             s.first_login_at,
             s.last_login_at,
             s.created_at,
-            SUM(a.status = 'present') AS present_count,
-            SUM(a.status = 'absent') AS absent_count
+            COUNT(a.id) FILTER (WHERE a.status = 'present') AS present_count,
+            COUNT(a.id) FILTER (WHERE a.status = 'absent') AS absent_count
          FROM students s
          LEFT JOIN attendance a ON a.student_id = s.id
          GROUP BY s.id, s.full_name, s.email, s.group_name, s.first_login_at, s.last_login_at, s.created_at
@@ -244,8 +256,8 @@ $students = $pdo->query(
             NULL AS first_login_at,
             NULL AS last_login_at,
             s.created_at,
-            SUM(a.status = 'present') AS present_count,
-            SUM(a.status = 'absent') AS absent_count
+            COUNT(a.id) FILTER (WHERE a.status = 'present') AS present_count,
+            COUNT(a.id) FILTER (WHERE a.status = 'absent') AS absent_count
          FROM students s
          LEFT JOIN attendance a ON a.student_id = s.id
          GROUP BY s.id, s.full_name, s.email, s.group_name, s.created_at
@@ -267,8 +279,8 @@ $moduleStats = $pdo->query(
         m.id,
         m.name,
         m.type,
-        SUM(a.status = 'present') AS present_count,
-        SUM(a.status = 'absent') AS absent_count
+        COUNT(a.id) FILTER (WHERE a.status = 'present') AS present_count,
+        COUNT(a.id) FILTER (WHERE a.status = 'absent') AS absent_count
      FROM modules m
      LEFT JOIN attendance a ON a.module_id = m.id
      GROUP BY m.id, m.name, m.type

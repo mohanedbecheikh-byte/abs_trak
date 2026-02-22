@@ -5,17 +5,29 @@ require_once __DIR__ . '/includes/security.php';
 
 function adminTableExists(PDO $pdo): bool
 {
-    $stmt = $pdo->query("SHOW TABLES LIKE 'admins'");
+    $stmt = $pdo->prepare(
+        "SELECT EXISTS (
+            SELECT 1
+            FROM information_schema.tables
+            WHERE table_schema = current_schema()
+              AND table_name = 'admins'
+        )"
+    );
+    $stmt->execute();
     return (bool)$stmt->fetchColumn();
 }
 
 function hasStudentLoginTrackingColumns(PDO $pdo): bool
 {
-    $columns = $pdo->query('SHOW COLUMNS FROM students')->fetchAll(PDO::FETCH_COLUMN, 0);
-    if (!is_array($columns)) {
-        return false;
-    }
-    return in_array('first_login_at', $columns, true) && in_array('last_login_at', $columns, true);
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) >= 2
+         FROM information_schema.columns
+         WHERE table_schema = current_schema()
+           AND table_name = 'students'
+           AND column_name IN ('first_login_at', 'last_login_at')"
+    );
+    $stmt->execute();
+    return (bool)$stmt->fetchColumn();
 }
 
 $nonce = securityPageNonce();
@@ -80,6 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $insert = $pdo->prepare('
                         INSERT INTO students (full_name, email, password_hash, group_name)
                         VALUES (?, ?, ?, ?)
+                        RETURNING id
                     ');
                     $insert->execute([
                         $fullName,
@@ -88,7 +101,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         'G1',
                     ]);
 
-                    $studentId = (int)$pdo->lastInsertId();
+                    $studentId = (int)$insert->fetchColumn();
                     if ($hasStudentLoginTracking) {
                         $touchLogin = $pdo->prepare(
                             'UPDATE students

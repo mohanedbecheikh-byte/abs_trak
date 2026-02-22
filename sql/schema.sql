@@ -1,68 +1,59 @@
-CREATE DATABASE IF NOT EXISTS abstrack
-  CHARACTER SET utf8mb4
-  COLLATE utf8mb4_unicode_ci;
-
-USE abstrack;
-
 CREATE TABLE IF NOT EXISTS students (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   full_name VARCHAR(100) NOT NULL,
   email VARCHAR(100) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
   group_name VARCHAR(10) DEFAULT 'G1',
-  first_login_at TIMESTAMP NULL DEFAULT NULL,
-  last_login_at TIMESTAMP NULL DEFAULT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  first_login_at TIMESTAMPTZ NULL,
+  last_login_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS modules (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   name VARCHAR(100) NOT NULL,
-  type ENUM('COURS', 'TD', 'TP', 'ENLIGNE') NOT NULL,
+  type VARCHAR(20) NOT NULL CHECK (type IN ('COURS', 'TD', 'TP', 'ENLIGNE')),
   teacher VARCHAR(100),
   room VARCHAR(50),
-  day_of_week ENUM('Samedi', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi'),
+  day_of_week VARCHAR(20) CHECK (day_of_week IN ('Samedi', 'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi')),
   time_start TIME,
   time_end TIME,
-  UNIQUE KEY unique_module_slot (name, type, day_of_week, time_start)
+  CONSTRAINT unique_module_slot UNIQUE (name, type, day_of_week, time_start)
 );
 
 CREATE TABLE IF NOT EXISTS weeks (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  week_number TINYINT NOT NULL,
+  id BIGSERIAL PRIMARY KEY,
+  week_number SMALLINT NOT NULL,
   date_start DATE NOT NULL,
   date_end DATE NOT NULL,
   semester VARCHAR(20) DEFAULT '2025-S2',
-  UNIQUE KEY unique_week_semester (semester, week_number)
+  CONSTRAINT unique_week_semester UNIQUE (semester, week_number)
 );
 
 CREATE TABLE IF NOT EXISTS attendance (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  student_id INT NOT NULL,
-  module_id INT NOT NULL,
-  week_id INT NOT NULL,
-  status ENUM('present', 'absent', 'unknown') DEFAULT 'unknown',
-  recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  UNIQUE KEY unique_record (student_id, module_id, week_id),
-  CONSTRAINT fk_attendance_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE,
-  CONSTRAINT fk_attendance_module FOREIGN KEY (module_id) REFERENCES modules(id) ON DELETE CASCADE,
-  CONSTRAINT fk_attendance_week FOREIGN KEY (week_id) REFERENCES weeks(id) ON DELETE CASCADE
+  id BIGSERIAL PRIMARY KEY,
+  student_id BIGINT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  module_id BIGINT NOT NULL REFERENCES modules(id) ON DELETE CASCADE,
+  week_id BIGINT NOT NULL REFERENCES weeks(id) ON DELETE CASCADE,
+  status VARCHAR(20) NOT NULL DEFAULT 'unknown' CHECK (status IN ('present', 'absent', 'unknown')),
+  recorded_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT unique_record UNIQUE (student_id, module_id, week_id)
 );
 
 CREATE TABLE IF NOT EXISTS teachers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   full_name VARCHAR(100),
   email VARCHAR(100) UNIQUE,
   password_hash VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS admins (
-  id INT AUTO_INCREMENT PRIMARY KEY,
+  id BIGSERIAL PRIMARY KEY,
   full_name VARCHAR(120) NOT NULL,
   email VARCHAR(120) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  last_login_at TIMESTAMP NULL DEFAULT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  last_login_at TIMESTAMPTZ NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 INSERT INTO modules (name, type, teacher, room, day_of_week, time_start, time_end)
@@ -75,7 +66,10 @@ VALUES
 ('Business Intelligence', 'TD', 'Taibouni', 'Salle 1 info', 'Mercredi', '08:00:00', '09:30:00'),
 ('Redaction Scientifique', 'TD', 'Boufedji', '-', 'Mardi', '09:35:00', '11:05:00'),
 ('Projet', 'TD', 'Taibouni', 'Salle 3 info', 'Mercredi', '12:45:00', '14:15:00')
-ON DUPLICATE KEY UPDATE teacher = VALUES(teacher), room = VALUES(room), time_end = VALUES(time_end);
+ON CONFLICT (name, type, day_of_week, time_start) DO UPDATE
+SET teacher = EXCLUDED.teacher,
+    room = EXCLUDED.room,
+    time_end = EXCLUDED.time_end;
 
 INSERT INTO weeks (week_number, date_start, date_end, semester)
 VALUES
@@ -93,4 +87,6 @@ VALUES
 (12, '2025-11-22', '2025-11-28', '2025-S2'),
 (13, '2025-11-29', '2025-12-05', '2025-S2'),
 (14, '2025-12-06', '2025-12-12', '2025-S2')
-ON DUPLICATE KEY UPDATE week_number = VALUES(week_number);
+ON CONFLICT (semester, week_number) DO UPDATE
+SET date_start = EXCLUDED.date_start,
+    date_end = EXCLUDED.date_end;

@@ -13,22 +13,22 @@ $pdo->beginTransaction();
 try {
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS admins (
-            id INT AUTO_INCREMENT PRIMARY KEY,
+            id BIGSERIAL PRIMARY KEY,
             full_name VARCHAR(120) NOT NULL,
             email VARCHAR(120) UNIQUE NOT NULL,
             password_hash VARCHAR(255) NOT NULL,
-            last_login_at TIMESTAMP NULL DEFAULT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
+            last_login_at TIMESTAMPTZ NULL DEFAULT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )"
     );
 
     if ($adminEmail !== '' && $adminPassword !== '') {
         $adminStmt = $pdo->prepare(
             "INSERT INTO admins (full_name, email, password_hash)
              VALUES (?, ?, ?)
-             ON DUPLICATE KEY UPDATE
-             full_name = VALUES(full_name),
-             password_hash = VALUES(password_hash)"
+             ON CONFLICT (email) DO UPDATE
+             SET full_name = EXCLUDED.full_name,
+                 password_hash = EXCLUDED.password_hash"
         );
         $adminStmt->execute([
             $adminName !== '' ? $adminName : 'Main Administrator',
@@ -41,7 +41,9 @@ try {
         $student = $pdo->prepare(
             "INSERT INTO students (full_name, email, password_hash, group_name)
              VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE full_name = VALUES(full_name), password_hash = VALUES(password_hash)"
+             ON CONFLICT (email) DO UPDATE
+             SET full_name = EXCLUDED.full_name,
+                 password_hash = EXCLUDED.password_hash"
         );
         $student->execute([$demoStudentName, $demoStudentEmail, $passwordHash, 'G1']);
     }
@@ -63,7 +65,10 @@ try {
     $moduleStmt = $pdo->prepare(
         "INSERT INTO modules (name, type, teacher, room, day_of_week, time_start, time_end)
          VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE teacher = VALUES(teacher), room = VALUES(room), time_end = VALUES(time_end)"
+         ON CONFLICT (name, type, day_of_week, time_start) DO UPDATE
+         SET teacher = EXCLUDED.teacher,
+             room = EXCLUDED.room,
+             time_end = EXCLUDED.time_end"
     );
     foreach ($modules as $module) {
         $moduleStmt->execute($module);
@@ -73,7 +78,9 @@ try {
     $weekStmt = $pdo->prepare(
         "INSERT INTO weeks (week_number, date_start, date_end, semester)
          VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE date_start = VALUES(date_start), date_end = VALUES(date_end)"
+         ON CONFLICT (semester, week_number) DO UPDATE
+         SET date_start = EXCLUDED.date_start,
+             date_end = EXCLUDED.date_end"
     );
     for ($i = 1; $i <= 14; $i++) {
         $weekStart = $start->modify('+' . (($i - 1) * 7) . ' days');

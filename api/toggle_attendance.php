@@ -48,7 +48,10 @@ if (!$weekExists->fetchColumn()) {
 $stmt = $pdo->prepare(
     "INSERT INTO attendance (student_id, module_id, week_id, status)
      VALUES (?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE status = VALUES(status)"
+     ON CONFLICT (student_id, module_id, week_id)
+     DO UPDATE SET
+       status = EXCLUDED.status,
+       recorded_at = NOW()"
 );
 try {
     $stmt->execute([$studentId, $moduleId, $weekId, $newStatus]);
