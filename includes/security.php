@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/env.php';
+
 function securityPageNonce(): string
 {
     static $nonce = null;

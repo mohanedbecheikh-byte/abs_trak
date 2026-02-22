@@ -1,0 +1,14 @@
+.env
+.env.*
+!.env.example
+
+# Local runtime artifacts
+*.log
+logs/
+tmp/
+storage/
+
+# IDE and OS noise
+.DS_Store
+Thumbs.db
+.vscode/
